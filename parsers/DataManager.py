@@ -268,7 +268,7 @@ class DataManager:
         serializable_dict = {
             'Profiles': self.card_dict['Profiles'],
             'Emails': self.card_dict['Emails'],
-            'Phones': self.card_dict['Phones'],
+            'PhoneNumbers': self.card_dict['PhoneNumbers'],
             'Donations': self.card_dict['Donations'],
             'Names': self.card_dict['Names'],
             'Addresses': self.card_dict['Addresses'],
