@@ -90,9 +90,9 @@ class HTMLParser:
         data['PhoneNumbers'] = list(set(data['PhoneNumbers'] + [phone.strip() for phone in phones]))
 
         # Extract donation information based on common patterns
-        for pattern in key_data_patterns['donation']:
-            for match in re.finditer(pattern, data['RawText']):
-                donations.append(match.group())
+        pattern = key_data_patterns['donation']
+        for match in re.finditer(pattern, data['RawText']):
+            donations.append(match.group())
         data['Donations'] = list(set(data['Donations'] + donations))
 
         # Extract names (assuming they are in 'h1', 'h2', or 'h3' tags for prominence)
