@@ -56,8 +56,8 @@ class EmailExtractor:
         address_pattern = r'\d{1,5}\s\w+(\s\w+)*,\s\w+,\s[A-Z]{2}\s\d{5}'  # Matches "123 Main St, City, ST 12345"
         addresses = re.findall(address_pattern, text)
         
-        # Extract phone numbers
-        phone_pattern = r'\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}'  # Matches phone numbers like (123) 456-7890
+        # Extract phone numbers (use a robust, consistent pattern)
+        phone_pattern = r'(?:\+?\d{1,2}[\s.-]?)?(?:\(?\d{3}\)?[\s.-]?)?\d{3}[\s.-]?\d{4}'  # Matches international and US phone numbers
         phones = re.findall(phone_pattern, text)
         
         # Only create profile if we have valid information

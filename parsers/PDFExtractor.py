@@ -4,6 +4,7 @@ import fitz  # PyMuPDF
 import os
 import hashlib
 import requests
+from datetime import datetime
 # Import key_data_patterns from config.py
 from config import key_data_patterns
 
@@ -63,6 +64,11 @@ class PDFExtractor:
                         contact_data['phone_numbers'].extend(matches)
                     elif pattern_name == 'address':
                         contact_data['addresses'].extend(matches)
+
+            # Deduplicate emails, phone_numbers, and addresses
+            contact_data['emails'] = list(dict.fromkeys(contact_data['emails']))
+            contact_data['phone_numbers'] = list(dict.fromkeys(contact_data['phone_numbers']))
+            contact_data['addresses'] = list(dict.fromkeys(contact_data['addresses']))
 
             # Create profile if we have any contact information
             if any(contact_data.values()):
@@ -161,7 +167,6 @@ class PDFExtractor:
             if re.search(pattern, text):
                 logging.info(f"Found key data ({key}) in PDF.")
                 return True
-        return False
         logging.info("No key data found in PDF.")
         return False
 

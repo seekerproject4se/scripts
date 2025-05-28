@@ -46,6 +46,9 @@ class ContactParser:
         for key in ['profiles', 'emails', 'phone_numbers', 'addresses']:
             if key not in self.contacts:
                 self.contacts[key] = []
+            else:
+                # Deduplicate each list
+                self.contacts[key] = list(dict.fromkeys(self.contacts[key]))
 
         # Update our internal data structure
         self.contacts['profiles'].extend([
@@ -59,14 +62,22 @@ class ContactParser:
             }
             for contact in contacts
         ])
+        # Deduplicate profiles by name
+        seen_names = set()
+        unique_profiles = []
+        for profile in self.contacts['profiles']:
+            if profile['name'] and profile['name'] not in seen_names:
+                unique_profiles.append(profile)
+                seen_names.add(profile['name'])
+        self.contacts['profiles'] = unique_profiles
 
         # Also update the individual collections
         for contact in contacts:
-            if contact.get('email'):
+            if contact.get('email') and contact['email'] not in self.contacts['emails']:
                 self.contacts['emails'].append(contact['email'])
-            if contact.get('phone'):
+            if contact.get('phone') and contact['phone'] not in self.contacts['phone_numbers']:
                 self.contacts['phone_numbers'].append(contact['phone'])
-            if contact.get('address'):
+            if contact.get('address') and contact['address'] not in self.contacts['addresses']:
                 self.contacts['addresses'].append(contact['address'])
 
         return self.contacts

@@ -1,5 +1,6 @@
 import requests
 import logging
+from datetime import datetime
 
 class MicrosoftExtractor:
     def __init__(self, access_token):
@@ -49,10 +50,18 @@ class MicrosoftExtractor:
                     if phone not in self.contacts['phone_numbers']:
                         self.contacts['phone_numbers'].append(phone)
 
-            logging.info(f"Fetched {len(self.contacts['profiles'])} contacts from Outlook.")
-            return self.contacts
+            # Deduplicate emails, phone_numbers, and profiles
+            self.contacts['emails'] = list(dict.fromkeys(self.contacts['emails']))
+            self.contacts['phone_numbers'] = list(dict.fromkeys(self.contacts['phone_numbers']))
+            seen_names = set()
+            unique_profiles = []
+            for profile in self.contacts['profiles']:
+                if profile['name'] and profile['name'] not in seen_names:
+                    unique_profiles.append(profile)
+                    seen_names.add(profile['name'])
+            self.contacts['profiles'] = unique_profiles
 
-            logging.info(f"Fetched {len(self.contacts)} contacts from Outlook.")
+            logging.info(f"Fetched {len(self.contacts['profiles'])} contacts from Outlook.")
             return self.contacts
         except Exception as e:
             logging.error(f"Error fetching Outlook contacts: {e}")

@@ -44,7 +44,6 @@ class WordPressExtractor:
                         'donation_context': '',
                         'fetched_at': datetime.now().isoformat()
                     }
-                    
                     # Update data structure using DataManager's structure
                     self.data_manager.add_donor_profile(profile)
                     if user.get('email'):
@@ -52,8 +51,10 @@ class WordPressExtractor:
                             'Emails': [user['email']],
                             'Profiles': [profile]
                         })
-
-                logging.info(f"Fetched {len(self.contacts['profiles'])} contacts from WordPress.")
+                # Deduplicate emails and profiles
+                self.contacts['Emails'] = list(dict.fromkeys(self.contacts.get('Emails', [])))
+                self.contacts['Profiles'] = [dict(t) for t in {tuple(sorted(p.items())) for p in self.contacts.get('Profiles', [])}]
+                logging.info(f"Fetched {len(self.contacts['Profiles'])} contacts from WordPress.")
                 return self.contacts
 
             except requests.exceptions.HTTPError as e:
