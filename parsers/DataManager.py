@@ -251,13 +251,21 @@ class DataManager:
                 with open(filename, 'r', encoding='utf-8') as f:
                     existing_data = json.load(f)
                 
-                # Convert existing data sets back to sets
+                # Convert existing data lists to sets for deduplication (use correct keys)
                 existing_data['Emails'] = set(existing_data.get('Emails', []))
-                existing_data['Phones'] = set(existing_data.get('Phones', []))
-                existing_data['Donations'] = set(existing_data.get('Donations', []))
+                existing_data['PhoneNumbers'] = set(existing_data.get('PhoneNumbers', []))
+                existing_data['Donations'] = set(tuple(sorted(d.items())) for d in existing_data.get('Donations', []))
                 existing_data['Names'] = set(existing_data.get('Names', []))
                 existing_data['Addresses'] = set(existing_data.get('Addresses', []))
                 existing_data['PDFLinks'] = set(existing_data.get('PDFLinks', []))
+                
+                # Convert sets back to lists for merging
+                existing_data['Emails'] = list(existing_data['Emails'])
+                existing_data['PhoneNumbers'] = list(existing_data['PhoneNumbers'])
+                existing_data['Donations'] = [dict(t) for t in existing_data['Donations']]
+                existing_data['Names'] = list(existing_data['Names'])
+                existing_data['Addresses'] = list(existing_data['Addresses'])
+                existing_data['PDFLinks'] = list(existing_data['PDFLinks'])
                 
                 # Merge with new data
                 self.update_data(existing_data)
