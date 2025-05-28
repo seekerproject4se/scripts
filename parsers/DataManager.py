@@ -123,68 +123,32 @@ class DataManager:
             # First clean the incoming data to ensure consistency
             cleaned_data = self.clean_data(data)
 
-            # Update each field in card_dict
+            # Safeguard: Only add truly new items (by unique key) to each field
             for field in self.card_dict:
                 if field in cleaned_data:
                     # Ensure we have a list
                     if not isinstance(cleaned_data[field], list):
                         cleaned_data[field] = [cleaned_data[field]]
-                    
-                    # Update the card_dict field
-                    self.card_dict[field].extend(cleaned_data[field])
-                    
-                    # Remove duplicates while preserving order
+                    # Only add items not already present
                     if field in ['Profiles', 'Donors']:
-                        # For profiles and donors, check for duplicates based on name
-                        unique_items = []
-                        seen_names = set()
-                        for item in self.card_dict[field]:
+                        # For profiles/donors, use 'name' as unique key
+                        existing_names = {item.get('name') for item in self.card_dict[field] if isinstance(item, dict)}
+                        for item in cleaned_data[field]:
+                            if isinstance(item, dict) and item.get('name') and item.get('name') not in existing_names:
+                                self.card_dict[field].append(item)
+                                existing_names.add(item.get('name'))
+                    else:
+                        # For simple lists, only add new unique items
+                        existing_items = set(self.card_dict[field])
+                        for item in cleaned_data[field]:
                             if isinstance(item, dict):
-                                name = item.get('name')
-                                if name and name not in seen_names:
-                                    unique_items.append(item)
-                                    seen_names.add(name)
-                            else:
-                                unique_items.append(item)
-                        self.card_dict[field] = unique_items
-                    elif field in ['Emails', 'PhoneNumbers', 'Addresses', 'Names', 'PDFLinks', 'Donations']:
-                        # For simple lists, convert to strings and remove duplicates
-                        seen_items = set()
-                        unique_items = []
-                        for item in self.card_dict[field]:
-                            if isinstance(item, dict):
-                                # For donations, use amount as key
-                                key = f"{item.get('amount', '')}_{item.get('source', '')}"
+                                key = str(item)
                             else:
                                 key = str(item)
-                            if key not in seen_items:
-                                unique_items.append(item)
-                                seen_items.add(key)
-                        self.card_dict[field] = unique_items
-
-            logging.info("Successfully updated card_dict")
-
-            # Update each field in the data structure
-            for key in self.card_dict.keys():
-                if key in cleaned_data:
-                    self.card_dict[key].extend(cleaned_data[key])
-                    # Remove duplicates while preserving order
-                    if key == 'Profiles':
-                        # For profiles, we need to check for duplicates based on name
-                        unique_profiles = []
-                        seen_names = set()
-                        for profile in self.card_dict[key]:
-                            if profile.get('name') not in seen_names:
-                                unique_profiles.append(profile)
-                                seen_names.add(profile.get('name'))
-                        self.card_dict[key] = unique_profiles
-                    elif key in ['Emails', 'PhoneNumbers', 'Addresses', 'Names', 'PDFLinks']:
-                        self.card_dict[key] = list(dict.fromkeys(self.card_dict[key]))
-                    # For lists of dicts (like Donations), skip dict.fromkeys to avoid unhashable error
-                    # Add custom deduplication for Donations if needed
-
-            logging.info("Data update completed successfully")
-
+                            if key not in existing_items:
+                                self.card_dict[field].append(item)
+                                existing_items.add(key)
+            logging.info("Safeguard: Only new data added to card_dict.")
         except Exception as e:
             logging.error(f"Error updating data: {str(e)}")
             raise
@@ -237,7 +201,7 @@ class DataManager:
     def save_to_file(self, directory):
         """
         Save the card_dict to a JSON file in the specified directory.
-        If the file exists, merge the new data with the existing data.
+        If the file exists, merge the new data with the existing data, but do not overwrite existing entries.
 
         Args:
             directory (str): The directory where the file should be saved.
@@ -251,23 +215,7 @@ class DataManager:
                 with open(filename, 'r', encoding='utf-8') as f:
                     existing_data = json.load(f)
                 
-                # Convert existing data lists to sets for deduplication (use correct keys)
-                existing_data['Emails'] = set(existing_data.get('Emails', []))
-                existing_data['PhoneNumbers'] = set(existing_data.get('PhoneNumbers', []))
-                existing_data['Donations'] = set(tuple(sorted(d.items())) for d in existing_data.get('Donations', []))
-                existing_data['Names'] = set(existing_data.get('Names', []))
-                existing_data['Addresses'] = set(existing_data.get('Addresses', []))
-                existing_data['PDFLinks'] = set(existing_data.get('PDFLinks', []))
-                
-                # Convert sets back to lists for merging
-                existing_data['Emails'] = list(existing_data['Emails'])
-                existing_data['PhoneNumbers'] = list(existing_data['PhoneNumbers'])
-                existing_data['Donations'] = [dict(t) for t in existing_data['Donations']]
-                existing_data['Names'] = list(existing_data['Names'])
-                existing_data['Addresses'] = list(existing_data['Addresses'])
-                existing_data['PDFLinks'] = list(existing_data['PDFLinks'])
-                
-                # Merge with new data
+                # Only add new data (safeguard)
                 self.update_data(existing_data)
         except Exception as e:
             logging.warning(f"Error loading existing data: {e}")
