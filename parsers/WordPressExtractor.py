@@ -1,6 +1,8 @@
 import requests
 import logging
 import time
+from datetime import datetime
+from .DataManager import DataManager  # Fixed import
 
 class WordPressExtractor:
     def __init__(self, site_url, username, application_password, data_manager=None):
@@ -48,7 +50,7 @@ class WordPressExtractor:
                     if user.get('email'):
                         self.data_manager.update_data({
                             'Emails': [user['email']],
-                            'DonorProfiles': [profile]
+                            'Profiles': [profile]
                         })
 
                 logging.info(f"Fetched {len(self.contacts['profiles'])} contacts from WordPress.")

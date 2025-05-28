@@ -50,7 +50,7 @@ class GoogleExtractor:
                         'Emails': [email.get('value', '') for email in person.get('emailAddresses', [])],
                         'PhoneNumbers': [phone.get('value', '') for phone in person.get('phoneNumbers', [])],
                         'Addresses': [address.get('formattedValue', '') for address in person.get('addresses', [])],
-                        'DonorProfiles': [profile]
+                        'Profiles': [profile]
                     })
                     
                     # Update individual collections

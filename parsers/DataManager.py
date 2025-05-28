@@ -266,7 +266,7 @@ class DataManager:
 
         # Prepare data for JSON serialization
         serializable_dict = {
-            'DonorProfiles': self.card_dict['DonorProfiles'],
+            'Profiles': self.card_dict['Profiles'],
             'Emails': self.card_dict['Emails'],
             'Phones': self.card_dict['Phones'],
             'Donations': self.card_dict['Donations'],
@@ -290,7 +290,7 @@ class DataManager:
             data_list (list): List of data dictionaries to consolidate.
         """
         consolidated_data = {
-            'DonorProfiles': [],
+            'Profiles': [],
             'Emails': set(),
             'Phones': set(),
             'Donations': [],  # Use list for dictionaries
@@ -302,10 +302,9 @@ class DataManager:
 
         for data in data_list:
             # Add donor profiles
-            if 'DonorProfiles' in data:
-                for profile in data['DonorProfiles']:
-                    existing_profile = None
-                    for idx, existing in enumerate(consolidated_data['DonorProfiles']):
+            if 'Profiles' in data:
+                for profile in data['Profiles']:
+                    for idx, existing in enumerate(consolidated_data['Profiles']):
                         if existing['name'] == profile['name']:
                             existing_profile = existing
                             break
@@ -321,7 +320,7 @@ class DataManager:
                             datetime.fromisoformat(profile['last_seen'])
                         ).isoformat()
                     else:
-                        consolidated_data['DonorProfiles'].append(profile)
+                        consolidated_data['Profiles'].append(profile)
 
             # Add other data
             emails = data.get('Emails', [])
