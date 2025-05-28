@@ -67,6 +67,15 @@ class HTMLParser:
         # Extract all visible text
         data['RawText'] = soup.get_text(' ', strip=True)
 
+        # --- NEW: Extract emails and phone numbers from the full text ---
+        email_pattern = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
+        phone_pattern = r'(?:\\+?\\d{1,2}[\\s.-]?)?(?:\\(?\\d{3}\\)?[\\s.-]?)?\\d{3}[\\s.-]?\\d{4}'
+        emails_from_text = re.findall(email_pattern, data['RawText'])
+        phones_from_text = re.findall(phone_pattern, data['RawText'])
+        # Add to data, deduplicating
+        data['Emails'].extend([e for e in emails_from_text if e not in data['Emails']])
+        data['PhoneNumbers'].extend([p for p in phones_from_text if p not in data['PhoneNumbers']])
+
         # Donor-related keywords
         donor_keywords = [
             'donor', 'contributor', 'supporter', 'member', 'user', 'profile',
