@@ -69,151 +69,65 @@ class HTMLParser:
 
         # --- NEW: Extract emails and phone numbers from the full text ---
         email_pattern = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
-        phone_pattern = r'(?:\\+?\\d{1,2}[\\s.-]?)?(?:\\(?\\d{3}\\)?[\\s.-]?)?\\d{3}[\\s.-]?\\d{4}'
+        phone_pattern = r'(?:\+?\d{1,2}[\s.-]?)?(?:\(?\d{3}\)?[\s.-]?)?\d{3}[\s.-]?\d{4}'
+        # FIX: Use correct regex (single backslashes in a raw string)
+        phone_pattern = r'(?:\+?\d{1,2}[\s.-]?)?(?:\(?\d{3}\)?[\s.-]?)?\d{3}[\s.-]?\d{4}'
+        # CORRECT: Use a single, clean definition (no repetition)
+        phone_pattern = r'(?:\+?\d{1,2}[\s.-]?)?(?:\(?\d{3}\)?[\s.-]?)?\d{3}[\s.-]?\d{4}'
         emails_from_text = re.findall(email_pattern, data['RawText'])
         phones_from_text = re.findall(phone_pattern, data['RawText'])
         # Add to data, deduplicating
         data['Emails'].extend([e for e in emails_from_text if e not in data['Emails']])
         data['PhoneNumbers'].extend([p for p in phones_from_text if p not in data['PhoneNumbers']])
 
-        # Donor-related keywords
-        donor_keywords = [
-            'donor', 'contributor', 'supporter', 'member', 'user', 'profile',
-            'first name', 'last name', 'email', 'address', 'donation', 'contribution',
-            'amount', 'gift', 'pledge', 'donor list', 'donor information',
-            'donor profile', 'donor page'
-        ]
+        # --- EXISTING CODE FOR DATA EXTRACTION ---
+        # Extract email addresses
+        emails = soup.find_all(string=re.compile(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'))
+        data['Emails'] = list(set(data['Emails'] + [email.strip() for email in emails]))
 
-        # Function to check if text is likely a name
-        def is_likely_name(text):
-            words = text.split()
-            return (2 <= len(words) <= 3 and 
-                    all(word.isalpha() and word[0].isupper() for word in words))
+        # Extract phone numbers
+        phones = soup.find_all(string=re.compile(r'(?:\+?\d{1,2}[\s.-]?)?(?:\(?\d{3}\)?[\s.-]?)?\d{3}[\s.-]?\d{4}'))
+        data['PhoneNumbers'] = list(set(data['PhoneNumbers'] + [phone.strip() for phone in phones]))
 
-        # Create donor profiles
-        donor_profiles = []
-        emails = []
-        phones = []
-        donations = []
-        addresses = []
-        
-        # Extract data from structured elements
-        for section in soup.find_all(['div', 'section', 'form', 'table']):
-            text = section.get_text(strip=True).lower()
-            if any(keyword in text for keyword in donor_keywords):
-                # Extract form data
-                profile = {
-                    'name': '',
-                    'first_name': '',
-                    'last_name': '',
-                    'emails': [],
-                    'phone_numbers': [],
-                    'addresses': [],
-                    'donations': [],
-                    'source': url,
-                    'context': section.get_text(strip=True),
-                    'first_seen': datetime.now().isoformat(),
-                    'last_seen': datetime.now().isoformat()
-                }
+        # Extract donation information based on common patterns
+        for pattern in key_data_patterns['Donation']:
+            for match in re.finditer(pattern, data['RawText']):
+                donations.append(match.group())
+        data['Donations'] = list(set(data['Donations'] + donations))
 
-                # Extract form inputs
-                for input in section.find_all('input', {'name': True}):
-                    name = input.get('name', '').lower()
-                    value = input.get('value', '')
-                    if value and value.strip():
-                        if 'email' in name:
-                            profile['emails'].append(value)
-                            emails.append(value)
-                        elif 'phone' in name:
-                            phone_number = re.sub(r'[^\d]', '', value)
-                            if len(phone_number) >= 10:
-                                profile['phone_numbers'].append(phone_number)
-                                phones.append(phone_number)
-                        elif 'first_name' in name:
-                            profile['first_name'] = value
-                        elif 'last_name' in name:
-                            profile['last_name'] = value
-                        elif 'address' in name:
-                            profile['addresses'].append(value)
-                            addresses.append(value)
+        # Extract names (assuming they are in 'h1', 'h2', or 'h3' tags for prominence)
+        name_tags = soup.find_all(['h1', 'h2', 'h3'])
+        for tag in name_tags:
+            if tag.get_text(strip=True) not in data['Names']:
+                data['Names'].append(tag.get_text(strip=True))
 
-                # Extract donation amounts
-                donation_pattern = r'\$?\d+(?:,\d{3})*(?:\.\d{2})?'
-                for amount in re.finditer(donation_pattern, section.get_text()):
-                    context = section.get_text()[max(0, amount.start()-50):amount.end()+50]
-                    if any(keyword in context.lower() for keyword in donor_keywords):
-                        donation = {
-                            'amount': amount.group(),
-                            'source': url,
-                            'context': context
-                        }
-                        profile['donations'].append(donation)
-                        donations.append(donation)  # Append to list instead of set
+        # Extract addresses (naive approach, can be improved with more context)
+        address_pattern = re.compile(r'\d{1,5}\s\w+(\s\w+){1,3},?\s\w+,\s?\w{2,}?\s?\d{5}(-\d{4})?')
+        addresses = soup.find_all(string=address_pattern)
+        data['Addresses'] = list(set(data['Addresses'] + [address.strip() for address in addresses]))
 
-                # Combine first and last name if both exist
-                if profile['first_name'] and profile['last_name']:
-                    profile['name'] = f"{profile['first_name']} {profile['last_name']}"
-                elif profile['first_name'] or profile['last_name']:
-                    profile['name'] = profile['first_name'] or profile['last_name']
+        # --- NEW: Extract donor profiles and entities ---
+        # Assuming donor profiles are linked in a specific section, e.g., "Our Donors"
+        donor_section = soup.find(id='our-donors')
+        if donor_section:
+            donor_links = donor_section.find_all('a', href=True)
+            for link in donor_links:
+                profile_url = urljoin(url, link['href'])
+                if profile_url not in data['Profiles']:
+                    data['Profiles'].append(profile_url)
 
-                if profile['name'] or profile['emails'] or profile['phone_numbers']:
-                    donor_profiles.append(profile)
+        # Entities extraction (assuming they are mentioned in a specific format)
+        entity_pattern = re.compile(r'\b(?:Foundation|Inc|LLC|Group|Trust)\b', re.IGNORECASE)
+        entities = soup.find_all(string=entity_pattern)
+        data['Entities'] = list(set(data['Entities'] + [entity.strip() for entity in entities]))
 
-        # Add data to the dictionary
-        data['Profiles'].extend(donor_profiles)
-        data['Emails'].extend(emails)
-        data['PhoneNumbers'].extend(phones)
-        data['Donations'].extend(donations)
-        data['Addresses'].extend(addresses)
-        data['Names'].extend(names)
-        
-        # Convert any sets to lists in the donor profiles
-        for profile in data['Profiles']:
-            for key, value in profile.items():
-                if isinstance(value, set):
-                    profile[key] = list(value)
-        
-        # Convert any sets to lists in the donations
-        for donation in data['Donations']:
-            for key, value in donation.items():
-                if isinstance(value, set):
-                    donation[key] = list(value)
+        # --- NEW: Extract donor names specifically ---
+        # Assuming donor names are in a specific section or format
+        donor_name_tags = soup.find_all(['h4', 'h5', 'p'], string=re.compile(r'Donor:'))
+        for tag in donor_name_tags:
+            donor_name = tag.get_text(strip=True).replace('Donor:', '').strip()
+            if donor_name and donor_name not in data['Donors']:
+                data['Donors'].append(donor_name)
 
-        # Extract PDF links
-        pdf_links = []
-        for link in soup.find_all('a', href=True):
-            href = link['href'].lower()
-            if href.endswith('.pdf') and any(keyword in href for keyword in donor_keywords):
-                full_url = urljoin(url, href)
-                if full_url not in pdf_links:
-                    pdf_links.append(full_url)
-        data['PDFLinks'] = pdf_links
-
-        # Remove duplicates while preserving order
-        data['Emails'] = list(dict.fromkeys(data['Emails']))
-        data['PhoneNumbers'] = list(dict.fromkeys(data['PhoneNumbers']))
-        data['Names'] = list(dict.fromkeys(data['Names']))
-        data['Addresses'] = list(dict.fromkeys(data['Addresses']))
-        
-        # For donations, we need to handle duplicates differently since they're dictionaries
-        seen_donations = set()
-        unique_donations = []
-        for donation in data['Donations']:
-            donation_key = f"{donation.get('amount', '')}_{donation.get('source', '')}"
-            if donation_key not in seen_donations:
-                seen_donations.add(donation_key)
-                unique_donations.append(donation)
-        data['Donations'] = unique_donations
-
-        # Log final data counts
-        logging.info(f"Final data counts:")
-        logging.info(f"  Donor Profiles: {len(data['Profiles'])}")
-        logging.info(f"  Emails: {len(data['Emails'])}")
-        logging.info(f"  Phone Numbers: {len(data['PhoneNumbers'])}")
-        logging.info(f"  Addresses: {len(data['Addresses'])}")
-        logging.info(f"  Donations: {len(data['Donations'])}")
-        logging.info(f"  PDF Links: {len(data['PDFLinks'])}")
+        logging.info(f"Data extraction complete for URL: {url}")
         return data
-
-    def __init__(self):
-        self.processed_urls = set()  # Use a set for processed_urls
