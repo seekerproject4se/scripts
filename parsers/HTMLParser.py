@@ -170,29 +170,20 @@ class HTMLParser:
             if donor_name and donor_name not in data['Donors']:
                 data['Donors'].append(donor_name)
 
-        # --- DYNAMIC DONOR PROFILE EXTRACTION (signal-based) ---
-        us_states = set([
-            'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA',
-            'ME', 'MD', 'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NY', 'NC', 'ND', 'OH', 'OK',
-            'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY'
-        ])
-        zip_pattern = r'\b\d{5}(?:-\d{4})?\b'
-        state_zip_pattern = re.compile(r'\b([A-Z]{2})\s+' + zip_pattern)
+        # --- DYNAMIC DONOR PROFILE EXTRACTION (require email, phone, and name) ---
         for block in soup.find_all(['tr', 'li', 'div', 'section']):
             block_text = block.get_text(separator=' ', strip=True)
             email_match = re.search(email_pattern, block_text)
             phone_match = re.search(phone_pattern, block_text)
+            name_match = re.search(r'\b[A-Z][a-z]+ [A-Z][a-z]+\b', block_text)
             donation_match = re.search(pattern, block_text)
-            state_zip_match = state_zip_pattern.search(block_text)
-            # Only treat as donor/contact profile if it contains an email, phone, or state+ZIP
-            if email_match or phone_match or state_zip_match:
-                # Try to extract a plausible name (two capitalized words, but not required)
-                name_match = re.search(r'\b[A-Z][a-z]+ [A-Z][a-z]+\b', block_text)
-                name = name_match.group() if name_match else ''
+            # Only treat as donor/contact profile if it contains an email, phone, and name
+            if email_match and phone_match and name_match:
+                name = name_match.group()
                 profile = {
                     'name': name,
-                    'emails': [email_match.group()] if email_match else [],
-                    'phone_numbers': [phone_match.group()] if phone_match else [],
+                    'emails': [email_match.group()],
+                    'phone_numbers': [phone_match.group()],
                     'donations': [donation_match.group()] if donation_match else [],
                     'source': url,
                     'context': block_text
