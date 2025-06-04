@@ -32,6 +32,47 @@ class HTMLParser:
         return html_content
 
     @staticmethod
+    def _is_plausible_donor_name(name):
+        """
+        Heuristic to determine if a string is a plausible donor name.
+        - Not in navigation/menu/header keywords
+        - At least two words
+        - Not all uppercase or all lowercase
+        - No numbers or special chars (except hyphen, apostrophe)
+        - Not too short
+        """
+        if not name or len(name) < 5:
+            return False
+        nav_keywords = [
+            'menu', 'about', 'contact', 'donate', 'give', 'events', 'news', 'search', 'login', 'privacy',
+            'sitemap', 'newsletter', 'work with us', 'find us', 'careers', 'board', 'team', 'history',
+            'resources', 'fees', 'forms', 'agreements', 'apply', 'scholarships', 'grants', 'support',
+            'our affiliates', 'regional affiliates', 'foundation', 'center', 'gallery', 'conference',
+            'directions', 'parking', 'media', 'publications', 'stories', 'insights', 'open a fund',
+            'assets', 'investments', 'individuals', 'families', 'corporations', 'advisors', 'nonprofits',
+            'helping you thrive', 'meeting space', 'explore', 'myfftc', 'directory', 'list', 'join', 'request space',
+            'second nav', 'main nav', 'footer', 'header', 'home', 'find out', 'learn more', 'view all', 'connect with us',
+            'philanthropyfocus.org', 'charlotte area community calendar', 'stage', 'set', 'playing', 'planned giving',
+            'donor resources', 'fees', 'civic initiatives', 'support the robinson center', 'events & webinars',
+            'luski-gorelick', 'belk place', 'carolina theatre', 'levine conference', 'luski gallery', 'robinson center',
+            'north tryon', 'directory', 'email', 'directory', 'directory', 'email', 'directory', 'email', 'directory'
+        ]
+        name_lower = name.strip().lower()
+        for kw in nav_keywords:
+            if kw in name_lower:
+                return False
+        # At least two words
+        if len(name.split()) < 2:
+            return False
+        # Not all uppercase or all lowercase
+        if name.isupper() or name.islower():
+            return False
+        # No numbers or special chars (except hyphen, apostrophe)
+        if re.search(r'[^a-zA-Z\s\-\']', name):
+            return False
+        return True
+
+    @staticmethod
     def extract_data_from_html(html, url):
         """
         Extract relevant data (donor/user information) from the HTML content.
@@ -138,16 +179,17 @@ class HTMLParser:
             email_match = re.search(email_pattern, block_text)
             phone_match = re.search(phone_pattern, block_text)
             donation_match = re.search(pattern, block_text)
-            profile = {
-                'name': name,
-                'emails': [email_match.group()] if email_match else [],
-                'phone_numbers': [phone_match.group()] if phone_match else [],
-                'donations': [donation_match.group()] if donation_match else [],
-                'source': url,
-                'context': block_text
-            }
-            # Only add if at least name or email or phone or donation is present
-            if any([profile['name'], profile['emails'], profile['phone_numbers'], profile['donations']]):
+            # Only treat as donor name if it passes plausibility and is near a donation/email/phone
+            plausible_name = name and HTMLParser._is_plausible_donor_name(name)
+            if plausible_name and (email_match or phone_match or donation_match):
+                profile = {
+                    'name': name,
+                    'emails': [email_match.group()] if email_match else [],
+                    'phone_numbers': [phone_match.group()] if phone_match else [],
+                    'donations': [donation_match.group()] if donation_match else [],
+                    'source': url,
+                    'context': block_text
+                }
                 data['Profiles'].append(profile)
 
         logging.info(f"Data extraction complete for URL: {url}")
