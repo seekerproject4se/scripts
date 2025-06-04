@@ -129,5 +129,26 @@ class HTMLParser:
             if donor_name and donor_name not in data['Donors']:
                 data['Donors'].append(donor_name)
 
+        # --- DYNAMIC DONOR PROFILE EXTRACTION ---
+        for block in soup.find_all(['tr', 'li', 'div', 'section']):
+            block_text = block.get_text(separator=' ', strip=True)
+            # Heuristic: look for a name-like string (two capitalized words)
+            name_match = re.search(r'\b[A-Z][a-z]+ [A-Z][a-z]+\b', block_text)
+            name = name_match.group() if name_match else ''
+            email_match = re.search(email_pattern, block_text)
+            phone_match = re.search(phone_pattern, block_text)
+            donation_match = re.search(pattern, block_text)
+            profile = {
+                'name': name,
+                'emails': [email_match.group()] if email_match else [],
+                'phone_numbers': [phone_match.group()] if phone_match else [],
+                'donations': [donation_match.group()] if donation_match else [],
+                'source': url,
+                'context': block_text
+            }
+            # Only add if at least name or email or phone or donation is present
+            if any([profile['name'], profile['emails'], profile['phone_numbers'], profile['donations']]):
+                data['Profiles'].append(profile)
+
         logging.info(f"Data extraction complete for URL: {url}")
         return data
