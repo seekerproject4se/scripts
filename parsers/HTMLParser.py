@@ -43,24 +43,6 @@ class HTMLParser:
         """
         if not name or len(name) < 5:
             return False
-        nav_keywords = [
-            'menu', 'about', 'contact', 'donate', 'give', 'events', 'news', 'search', 'login', 'privacy',
-            'sitemap', 'newsletter', 'work with us', 'find us', 'careers', 'board', 'team', 'history',
-            'resources', 'fees', 'forms', 'agreements', 'apply', 'scholarships', 'grants', 'support',
-            'our affiliates', 'regional affiliates', 'foundation', 'center', 'gallery', 'conference',
-            'directions', 'parking', 'media', 'publications', 'stories', 'insights', 'open a fund',
-            'assets', 'investments', 'individuals', 'families', 'corporations', 'advisors', 'nonprofits',
-            'helping you thrive', 'meeting space', 'explore', 'myfftc', 'directory', 'list', 'join', 'request space',
-            'second nav', 'main nav', 'footer', 'header', 'home', 'find out', 'learn more', 'view all', 'connect with us',
-            'philanthropyfocus.org', 'charlotte area community calendar', 'stage', 'set', 'playing', 'planned giving',
-            'donor resources', 'fees', 'civic initiatives', 'support the robinson center', 'events & webinars',
-            'luski-gorelick', 'belk place', 'carolina theatre', 'levine conference', 'luski gallery', 'robinson center',
-            'north tryon', 'directory', 'email', 'directory', 'directory', 'email', 'directory', 'email', 'directory'
-        ]
-        name_lower = name.strip().lower()
-        for kw in nav_keywords:
-            if kw in name_lower:
-                return False
         # At least two words
         if len(name.split()) < 2:
             return False
@@ -170,25 +152,57 @@ class HTMLParser:
             if donor_name and donor_name not in data['Donors']:
                 data['Donors'].append(donor_name)
 
-        # --- DYNAMIC DONOR PROFILE EXTRACTION (require email, phone, and name) ---
+        # --- DYNAMIC DONOR PROFILE EXTRACTION (robust, positive-signal only) ---
+        def is_valid_email(email):
+            # Accept any valid email
+            return bool(email)
+        def is_valid_phone(phone):
+            digits = re.sub(r'\D', '', phone)
+            # Require at least 10 digits, not a year, not a price
+            if len(digits) < 10:
+                return False
+            if re.fullmatch(r'\d{4}', phone):
+                return False
+            if re.match(r'\$?\d+[\.,]?\d*', phone):
+                return False
+            return True
+        def is_plausible_name(name):
+            # At least two words, not all upper/lower, no numbers/special chars (except hyphen, apostrophe)
+            if not name or len(name.split()) < 2:
+                return False
+            if name.isupper() or name.islower():
+                return False
+            if re.search(r'[^a-zA-Z\s\-\']', name):
+                return False
+            return True
+        seen_profiles = set()
         for block in soup.find_all(['tr', 'li', 'div', 'section']):
             block_text = block.get_text(separator=' ', strip=True)
+            if len(block_text) < 15 or len(block_text) > 400:
+                continue
             email_match = re.search(email_pattern, block_text)
             phone_match = re.search(phone_pattern, block_text)
             name_match = re.search(r'\b[A-Z][a-z]+ [A-Z][a-z]+\b', block_text)
-            donation_match = re.search(pattern, block_text)
-            # Only treat as donor/contact profile if it contains an email, phone, and name
-            if email_match and phone_match and name_match:
-                name = name_match.group()
-                profile = {
-                    'name': name,
-                    'emails': [email_match.group()],
-                    'phone_numbers': [phone_match.group()],
-                    'donations': [donation_match.group()] if donation_match else [],
-                    'source': url,
-                    'context': block_text
-                }
-                data['Profiles'].append(profile)
+            email = email_match.group() if email_match else None
+            phone = phone_match.group() if phone_match else None
+            name = name_match.group() if name_match else ''
+            if not is_plausible_name(name):
+                continue
+            if not ((email and is_valid_email(email)) or (phone and is_valid_phone(phone))):
+                continue
+            profile_key = (name.lower(), email or '', phone or '')
+            if profile_key in seen_profiles:
+                continue
+            seen_profiles.add(profile_key)
+            profile = {
+                'name': name,
+                'emails': [email] if email else [],
+                'phone_numbers': [phone] if phone else [],
+                'donations': [],
+                'source': url,
+                'context': block_text
+            }
+            data['Profiles'].append(profile)
 
         logging.info(f"Data extraction complete for URL: {url}")
         return data
