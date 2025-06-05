@@ -126,6 +126,49 @@ async function extractPDFText(filePath) {
             }
         }
 
+        // --- Donor/contact profile extraction ---
+        // Split text into lines for proximity analysis
+        const lines = pageText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+        const namePattern = /\b([A-Z][a-z]+ [A-Z][a-z]+)\b/; // Simple two-capitalized-words
+        const donorProfiles = [];
+        const usedEmails = new Set();
+        const usedPhones = new Set();
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            const nameMatch = line.match(namePattern);
+            if (nameMatch) {
+                let name = nameMatch[1];
+                // Look for email/phone in same or nearby lines
+                let emailsFound = [];
+                let phonesFound = [];
+                for (let j = Math.max(0, i - 2); j <= Math.min(lines.length - 1, i + 2); j++) {
+                    const l = lines[j];
+                    const emailMatches = l.match(emailPattern) || [];
+                    const phoneMatches = (l.match(phonePattern) || []).map(p => p.replace(/[-.\s]+/g, ' ').trim());
+                    for (const e of emailMatches) {
+                        if (!usedEmails.has(e)) {
+                            emailsFound.push(e);
+                            usedEmails.add(e);
+                        }
+                    }
+                    for (const p of phoneMatches) {
+                        if (!usedPhones.has(p)) {
+                            phonesFound.push(p);
+                            usedPhones.add(p);
+                        }
+                    }
+                }
+                // Only add if we have a name and at least one email or phone
+                if ((emailsFound.length > 0 || phonesFound.length > 0) && name.length > 4) {
+                    donorProfiles.push({
+                        name,
+                        emails: emailsFound,
+                        phones: phonesFound
+                    });
+                }
+            }
+        }
+
         // Save extracted data with lists
         const data = {
             Emails: uniqueEmails,
@@ -135,7 +178,7 @@ async function extractPDFText(filePath) {
             PDFLinks: uniquePdfLinks,
             PDFData: pdfData,
             RawText: pageText,
-            Donors: [] // Add empty Donors array to match expected structure
+            Donors: donorProfiles // Now populated with extracted donor/contact profiles
         };
 
         const dataPath = path.join(directory, 'extracted_data.json');
