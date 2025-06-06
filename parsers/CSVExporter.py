@@ -45,9 +45,14 @@ class CSVExporter:
         """
         try:
             # Create a sanitized filename from the URL
-            parsed_url = urlparse(url)
-            domain = parsed_url.netloc.replace('.', '_')
-            filename = f"{domain}_donor_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+            if url:
+                parsed_url = urlparse(url)
+                domain = parsed_url.netloc.replace('.', '_') if parsed_url.netloc else 'unknown_domain'
+            else:
+                domain = 'unknown_domain'
+            directory = os.path.join('DATA', domain)
+            os.makedirs(directory, exist_ok=True)
+            filename = os.path.join(directory, f"{domain}_donor_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv")
             
             # Prepare the data for CSV export
             rows = []
@@ -199,9 +204,6 @@ class CSVExporter:
             
             # Write to CSV
             if rows:
-                directory = os.path.dirname(filename)  # Fixed directory path
-                os.makedirs(directory, exist_ok=True)
-                
                 with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
                     fieldnames = [
                         'Name', 'First Name', 'Last Name', 'Source URL', 'Type', 'Date',
