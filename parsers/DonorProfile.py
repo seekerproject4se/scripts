@@ -1,5 +1,6 @@
 import re
 from datetime import datetime
+import logging
 
 class DonorProfile:
     def __init__(self, name=None, source_url=None):
@@ -20,30 +21,45 @@ class DonorProfile:
             'phone_sources': [],  # Added for consistency
             'address_sources': []  # Added for consistency
         }
+        self.raw_emails = []
+        self.raw_phone_numbers = []
+        self.raw_addresses = []
 
     def add_email(self, email, source=None):
-        if self._validate_email(email):
+        if email not in self.raw_emails:
+            self.raw_emails.append(email)
+        if self._loose_validate_email(email):
             if email not in self.emails:
                 self.emails.append(email)
             if source and source not in self.metadata['email_sources']:
                 self.metadata['email_sources'].append(source)
             self.last_seen = datetime.now()
+        else:
+            logging.warning(f"Rejected email (format): {email}")
 
     def add_phone(self, phone, source=None):
-        if self._validate_phone(phone):
+        if phone not in self.raw_phone_numbers:
+            self.raw_phone_numbers.append(phone)
+        if self._loose_validate_phone(phone):
             if phone not in self.phone_numbers:
                 self.phone_numbers.append(phone)
             if source and source not in self.metadata['phone_sources']:
                 self.metadata['phone_sources'].append(source)
             self.last_seen = datetime.now()
+        else:
+            logging.warning(f"Rejected phone (format): {phone}")
 
     def add_address(self, address, source=None):
-        if self._validate_address(address):
+        if address not in self.raw_addresses:
+            self.raw_addresses.append(address)
+        if self._loose_validate_address(address):
             if address not in self.addresses:
                 self.addresses.append(address)
             if source and source not in self.metadata['address_sources']:
                 self.metadata['address_sources'].append(source)
             self.last_seen = datetime.now()
+        else:
+            logging.warning(f"Rejected address (format): {address}")
 
     def add_donation(self, amount, source=None, context=None, date=None):
         donation = {
@@ -56,6 +72,19 @@ class DonorProfile:
         if donation not in self.donations:
             self.donations.append(donation)
         self.last_seen = datetime.now()
+
+    def _loose_validate_email(self, email):
+        # Accept anything with an @ and a dot after it
+        return bool(re.search(r'@.+\.', email))
+
+    def _loose_validate_phone(self, phone):
+        # Accept anything with at least 7 digits, ignore non-digit chars
+        digits = re.sub(r'\D', '', phone)
+        return len(digits) >= 7
+
+    def _loose_validate_address(self, address):
+        # Accept anything with a number and at least one comma
+        return bool(re.search(r'\d', address)) and ',' in address
 
     def _validate_email(self, email):
         pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
@@ -83,14 +112,18 @@ class DonorProfile:
         return 'unknown'
 
     def to_dict(self):
-        return {
+        d = {
             'name': self.name,
             'source_url': self.source_url,
-            'emails': self.emails,  # Already a list
-            'phone_numbers': self.phone_numbers,  # Already a list
-            'addresses': self.addresses,  # Already a list
+            'emails': self.emails,
+            'phone_numbers': self.phone_numbers,
+            'addresses': self.addresses,
             'donations': self.donations,
             'metadata': self.metadata,
             'first_seen': self.first_seen.strftime('%Y-%m-%d %H:%M:%S'),
-            'last_seen': self.last_seen.strftime('%Y-%m-%d %H:%M:%S')
+            'last_seen': self.last_seen.strftime('%Y-%m-%d %H:%M:%S'),
+            'raw_emails': self.raw_emails,
+            'raw_phone_numbers': self.raw_phone_numbers,
+            'raw_addresses': self.raw_addresses
         }
+        return d
