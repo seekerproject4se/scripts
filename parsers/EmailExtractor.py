@@ -191,9 +191,23 @@ class EmailExtractor:
                     writer.writeheader()
             with open(filename, 'a', newline='') as csvfile:
                 writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-                for contact in self.contact_data:
-                    writer.writerow(contact)
-            self.contact_data = []
+                for profile in self.contact_data['profiles']:
+                    # Write each email/phone/address as a separate row if multiple exist
+                    emails = profile.get('emails', []) or ['']
+                    phones = profile.get('phone_numbers', []) or ['']
+                    addresses = profile.get('addresses', []) or ['']
+                    name = profile.get('name', '')
+                    # Write all combinations (cartesian product)
+                    for email in emails:
+                        for phone in phones:
+                            for address in addresses:
+                                writer.writerow({
+                                    'Email': email,
+                                    'Name': name,
+                                    'Address': address,
+                                    'Phone': phone
+                                })
+            self.contact_data = {'emails': [], 'phone_numbers': [], 'addresses': [], 'profiles': []}
             logging.info(f"Saved contact information to CSV file: {filename}")
         except Exception as e:
             logging.error(f"Error saving contact information to CSV: {e}")
