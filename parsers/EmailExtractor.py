@@ -7,6 +7,7 @@ import csv
 import re
 import logging
 from datetime import datetime
+from parsers.DonorProfile import DonorProfile
 
 class EmailExtractor:
     """
@@ -62,30 +63,27 @@ class EmailExtractor:
         
         # Only create profile if we have valid information
         if emails or names or addresses or phones:
-            profile = {
-                'name': names[0] if names else "",
-                'emails': emails,
-                'phone_numbers': phones,
-                'addresses': addresses,
-                'source': source,
-                'fetched_at': datetime.now().isoformat()
-            }
-            
-            # Update our data structure
-            self.contact_data['profiles'].append(profile)
-            
-            # Update individual collections
+            donor_profile = DonorProfile(name=names[0] if names else None, source_url=source)
             for email in emails:
+                donor_profile.add_email(email, source='email')
+            for phone in phones:
+                donor_profile.add_phone(phone, source='email')
+            for address in addresses:
+                donor_profile.add_address(address, source='email')
+            profile_dict = donor_profile.to_dict()
+            # Update our data structure
+            self.contact_data['profiles'].append(profile_dict)
+            # Update individual collections
+            for email in donor_profile.emails:
                 if email not in self.contact_data['emails']:
                     self.contact_data['emails'].append(email)
-            for phone in phones:
+            for phone in donor_profile.phone_numbers:
                 if phone not in self.contact_data['phone_numbers']:
                     self.contact_data['phone_numbers'].append(phone)
-            for address in addresses:
+            for address in donor_profile.addresses:
                 if address not in self.contact_data['addresses']:
                     self.contact_data['addresses'].append(address)
-            
-            return profile
+            return profile_dict
         return None
 
     def connect_to_email(self):

@@ -7,6 +7,7 @@ import requests
 from datetime import datetime
 # Import key_data_patterns from config.py
 from config import key_data_patterns
+from parsers.DonorProfile import DonorProfile
 
 class PDFExtractor:
     @staticmethod
@@ -70,17 +71,17 @@ class PDFExtractor:
             contact_data['phone_numbers'] = list(dict.fromkeys(contact_data['phone_numbers']))
             contact_data['addresses'] = list(dict.fromkeys(contact_data['addresses']))
 
-            # Create profile if we have any contact information
-            if any(contact_data.values()):
-                profile = {
-                    'name': '',  # PDFs typically don't have names
-                    'emails': contact_data['emails'],
-                    'phone_numbers': contact_data['phone_numbers'],
-                    'addresses': contact_data['addresses'],
-                    'source': 'pdf',
-                    'fetched_at': datetime.now().isoformat()
-                }
-                contact_data['profiles'].append(profile)
+            # Create profile using DonorProfile if we have any contact information
+            if contact_data['emails'] or contact_data['phone_numbers'] or contact_data['addresses']:
+                donor_profile = DonorProfile(name=None, source_url=pdf_url)
+                for email in contact_data['emails']:
+                    donor_profile.add_email(email, source='pdf')
+                for phone in contact_data['phone_numbers']:
+                    donor_profile.add_phone(phone, source='pdf')
+                for address in contact_data['addresses']:
+                    donor_profile.add_address(address, source='pdf')
+                profile_dict = donor_profile.to_dict()
+                contact_data['profiles'].append(profile_dict)
 
             # Check for key data
             if not PDFExtractor.contains_key_data(text, key_data_patterns):
@@ -111,36 +112,6 @@ class PDFExtractor:
                 pdf_file.write(response.content)
             logging.info(f"PDF downloaded and saved: {file_path}")
             return file_path, contact_data
-
-            # Check for key data
-            if not PDFExtractor.contains_key_data(text, key_data_patterns):
-                logging.info(f"PDF at {pdf_url} does not contain relevant data. Skipping download.")
-                return None
-
-            # Ensure the save directory exists
-            os.makedirs(save_directory, exist_ok=True)
-
-            # Get the filename from the URL
-            filename = os.path.basename(pdf_url)
-            file_path = os.path.join(save_directory, filename)
-
-            # Check for duplicates by comparing hashes
-            file_hash = hashlib.md5(response.content).hexdigest()
-            logging.debug(f"Hash of the new PDF: {file_hash}")
-            for existing_file in os.listdir(save_directory):
-                existing_file_path = os.path.join(save_directory, existing_file)
-                with open(existing_file_path, 'rb') as f:
-                    existing_file_hash = hashlib.md5(f.read()).hexdigest()
-                    logging.debug(f"Hash of existing file {existing_file}: {existing_file_hash}")
-                    if existing_file_hash == file_hash:
-                        logging.info(f"Duplicate PDF detected: {pdf_url}")
-                        return None  # Skip downloading duplicate files
-
-            # Save the PDF file
-            with open(file_path, 'wb') as pdf_file:
-                pdf_file.write(response.content)
-            logging.info(f"PDF downloaded and saved: {file_path}")
-            return file_path
 
         except requests.exceptions.RequestException as e:
             logging.error(f"Failed to fetch PDF from {pdf_url}: {e}")
