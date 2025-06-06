@@ -11,10 +11,36 @@ class CSVExporter:
     """
 
     @staticmethod
+    def extract_and_normalize_emails(text):
+        """
+        Extract and normalize both standard and obfuscated email formats from a string.
+        """
+        # Patterns for obfuscated emails
+        patterns = [
+            r'([\w\.-]+)\s*\[at\]\s*([\w\.-]+)\s*\[dot\]\s*([\w\.]+)',
+            r'([\w\.-]+)\s*\(at\)\s*([\w\.-]+)\s*\(dot\)\s*([\w\.]+)',
+            r'([\w\.-]+)\s+at\s+([\w\.-]+)\s+dot\s+([\w\.]+)',
+            r'([\w\.-]+)\s*\[@\]\s*([\w\.-]+)\s*\[\.\]\s*([\w\.]+)',
+            r'([\w\.-]+)\s*\{at\}\s*([\w\.-]+)\s*\{dot\}\s*([\w\.]+)',
+            r'([\w\.-]+)\s*\(at\)\s*([\w\.-]+)\s*\.\s*([\w\.]+)',
+            r'([\w\.-]+)\s*\[at\]\s*([\w\.-]+)\s*\.\s*([\w\.]+)',
+            r'([\w\.-]+)\s*at\s*([\w\.-]+)\s*\.\s*([\w\.]+)',
+        ]
+        # Standard email
+        standard_pattern = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
+        emails = set(re.findall(standard_pattern, text))
+        for pat in patterns:
+            for match in re.findall(pat, text, re.IGNORECASE):
+                email = f"{match[0]}@{match[1]}.{match[2]}"
+                emails.add(email.replace(' ', ''))
+        return list(emails)
+
+    @staticmethod
     def is_valid_email(email):
         """
         Validate an email address using a regex pattern.
         """
+        # Accept both standard and normalized obfuscated emails
         email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
         return re.match(email_pattern, email) is not None
 
@@ -81,6 +107,11 @@ class CSVExporter:
                 emails = profile.get('Emails', [])
                 if not isinstance(emails, list):
                     emails = [emails] if emails else []
+                # Also scan for obfuscated emails in any text fields
+                for field in ['name', 'source', 'context']:
+                    if field in profile and isinstance(profile[field], str):
+                        emails.extend(CSVExporter.extract_and_normalize_emails(profile[field]))
+                emails = list(set(emails))
                 for email in emails:
                     if isinstance(email, str) and CSVExporter.is_valid_email(email):
                         row = base_row.copy()
@@ -128,21 +159,24 @@ class CSVExporter:
 
             # Add standalone emails
             for email in data_dict.get('Emails', []):
-                if isinstance(email, str) and CSVExporter.is_valid_email(email):
-                    row = {
-                        'Name': '',
-                        'First Name': '',
-                        'Last Name': '',
-                        'Source URL': url,
-                        'Type': 'email',
-                        'Date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                        'Email': email,
-                        'Phone': '',
-                        'Address': '',
-                        'Donation Amount': '',
-                        'Donation Context': ''
-                    }
-                    rows.append(row)
+                # Also scan for obfuscated emails in the email string
+                found_emails = CSVExporter.extract_and_normalize_emails(email) if isinstance(email, str) else []
+                for em in found_emails:
+                    if CSVExporter.is_valid_email(em):
+                        row = {
+                            'Name': '',
+                            'First Name': '',
+                            'Last Name': '',
+                            'Source URL': url,
+                            'Type': 'email',
+                            'Date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                            'Email': em,
+                            'Phone': '',
+                            'Address': '',
+                            'Donation Amount': '',
+                            'Donation Context': ''
+                        }
+                        rows.append(row)
 
             # Add standalone phone numbers
             for phone in data_dict.get('PhoneNumbers', []):
@@ -205,15 +239,20 @@ class CSVExporter:
             # Write to CSV
             if rows:
                 with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
+                    # Ensure all fieldnames are present in every row
                     fieldnames = [
                         'Name', 'First Name', 'Last Name', 'Source URL', 'Type', 'Date',
                         'Email', 'Phone', 'Address',
                         'Donation Amount', 'Donation Context'
                     ]
-                    writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                    writer = csv.DictWriter(csvfile, fieldnames=fieldnames, extrasaction='ignore')
                     writer.writeheader()
-                    writer.writerows(rows)
-                
+                    for row in rows:
+                        # Fill missing fields with empty string
+                        for field in fieldnames:
+                            if field not in row:
+                                row[field] = ''
+                        writer.writerow(row)
                 logging.info(f"Successfully saved data to {filename}")
                 return filename
             else:
