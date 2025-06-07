@@ -87,6 +87,10 @@ if __name__ == '__main__':
     parser_arg.add_argument('--email-pass', type=str, help='IMAP password for email extraction')
     parser_arg.add_argument('--email-folder', type=str, default='INBOX', help='IMAP folder to parse')
     parser_arg.add_argument('--email-dir', type=str, help='Directory of .eml/.mbox files for file-based extraction')
+    parser_arg.add_argument('--wp-site-url', type=str, help='WordPress site URL for contact extraction')
+    parser_arg.add_argument('--wp-username', type=str, help='WordPress username for contact extraction')
+    parser_arg.add_argument('--wp-app-password', type=str, help='WordPress application password for contact extraction')
+    parser_arg.add_argument('--ms-access-token', type=str, help='Microsoft Graph API access token for contact extraction')
     args = parser_arg.parse_args()
 
     if args.mode == 'runserver':
@@ -98,6 +102,22 @@ if __name__ == '__main__':
             credentials_file='credentials.json'
         )
         contact_parser.save_to_csv("gmail_contacts.csv")
+        # Optionally fetch WordPress contacts if args provided
+        if args.wp_site_url and args.wp_username and args.wp_app_password:
+            wp_contacts = contact_parser.fetch_contacts(
+                system='wordpress',
+                site_url=args.wp_site_url,
+                username=args.wp_username,
+                application_password=args.wp_app_password
+            )
+            contact_parser.save_to_csv("wordpress_contacts.csv")
+        # Optionally fetch Microsoft contacts if access token provided
+        if args.ms_access_token:
+            ms_contacts = contact_parser.fetch_contacts(
+                system='microsoft',
+                access_token=args.ms_access_token
+            )
+            contact_parser.save_to_csv("microsoft_contacts.csv")
         app.run(host=args.host, port=args.port)
     elif args.mode == 'scan':
         if not args.url:
@@ -120,6 +140,24 @@ if __name__ == '__main__':
             merge_profiles(web_json, email_csv, output_path)
         else:
             print('No data to merge.')
+        # Add WordPress extraction if args provided
+        if args.wp_site_url and args.wp_username and args.wp_app_password:
+            contact_parser = ContactParser()
+            wp_contacts = contact_parser.fetch_contacts(
+                system='wordpress',
+                site_url=args.wp_site_url,
+                username=args.wp_username,
+                application_password=args.wp_app_password
+            )
+            contact_parser.save_to_csv("wordpress_contacts.csv")
+        # Add Microsoft extraction if access token provided
+        if args.ms_access_token:
+            contact_parser = ContactParser()
+            ms_contacts = contact_parser.fetch_contacts(
+                system='microsoft',
+                access_token=args.ms_access_token
+            )
+            contact_parser.save_to_csv("microsoft_contacts.csv")
     elif args.mode == 'email':
         extractor = EmailExtractor(
             host=args.email_host,

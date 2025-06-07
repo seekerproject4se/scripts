@@ -183,11 +183,12 @@ async function extractPDFText(filePath) {
 
         const dataPath = path.join(directory, 'extracted_data.json');
         fs.writeFileSync(dataPath, JSON.stringify(data, null, 2));
-        console.log(`Extracted data saved to: ${dataPath}`);
+        // Print only the JSON to stdout for Python to parse
+        console.log(JSON.stringify(data));
     } catch (error) {
         console.error(`Error processing URL ${url}:`, error.message);
     } finally {
         await browser.close();
-        console.log('Browser closed.');
+        console.error('Browser closed.');
     }
 })();
