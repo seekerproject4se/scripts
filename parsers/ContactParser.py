@@ -37,7 +37,9 @@ class ContactParser:
             extracted_contacts = extractor.fetch_contacts()
             contacts = extracted_contacts
         elif system == 'microsoft':
-            extractor = MicrosoftExtractor(kwargs['access_token'])
+            # Accept access_token directly, or auto-fetch from env if not provided
+            access_token = kwargs.get('access_token')
+            extractor = MicrosoftExtractor(access_token)
             contacts = extractor.fetch_contacts()
         else:
             raise ValueError(f"Unknown system: {system}")
@@ -54,13 +56,13 @@ class ContactParser:
         self.contacts['profiles'].extend([
             {
                 'name': contact.get('name', ''),
-                'emails': [contact.get('email')] if contact.get('email') else [],
-                'phone_numbers': [contact.get('phone')] if contact.get('phone') else [],
-                'addresses': [contact.get('address')] if contact.get('address') else [],
+                'emails': contact.get('emails', []),
+                'phone_numbers': contact.get('phone_numbers', []),
+                'addresses': contact.get('addresses', []),
                 'source': system,
                 'fetched_at': datetime.now().isoformat()
             }
-            for contact in contacts
+            for contact in contacts.get('profiles', contacts)
         ])
         # Deduplicate profiles by name
         seen_names = set()
@@ -72,13 +74,16 @@ class ContactParser:
         self.contacts['profiles'] = unique_profiles
 
         # Also update the individual collections
-        for contact in contacts:
-            if contact.get('email') and contact['email'] not in self.contacts['emails']:
-                self.contacts['emails'].append(contact['email'])
-            if contact.get('phone') and contact['phone'] not in self.contacts['phone_numbers']:
-                self.contacts['phone_numbers'].append(contact['phone'])
-            if contact.get('address') and contact['address'] not in self.contacts['addresses']:
-                self.contacts['addresses'].append(contact['address'])
+        for profile in self.contacts['profiles']:
+            for email in profile.get('emails', []):
+                if email and email not in self.contacts['emails']:
+                    self.contacts['emails'].append(email)
+            for phone in profile.get('phone_numbers', []):
+                if phone and phone not in self.contacts['phone_numbers']:
+                    self.contacts['phone_numbers'].append(phone)
+            for address in profile.get('addresses', []):
+                if address and address not in self.contacts['addresses']:
+                    self.contacts['addresses'].append(address)
 
         return self.contacts
 
