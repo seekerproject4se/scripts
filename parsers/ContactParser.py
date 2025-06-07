@@ -53,6 +53,7 @@ class ContactParser:
                 self.contacts[key] = list(dict.fromkeys(self.contacts[key]))
 
         # Update our internal data structure
+        profiles_list = contacts.get('profiles') if isinstance(contacts, dict) else contacts
         self.contacts['profiles'].extend([
             {
                 'name': contact.get('name', ''),
@@ -62,7 +63,7 @@ class ContactParser:
                 'source': system,
                 'fetched_at': datetime.now().isoformat()
             }
-            for contact in contacts.get('profiles', contacts)
+            for contact in profiles_list
         ])
         # Deduplicate profiles by name
         seen_names = set()
