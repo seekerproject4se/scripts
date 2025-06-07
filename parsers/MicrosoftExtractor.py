@@ -1,10 +1,32 @@
+import os
 import requests
 import logging
 from datetime import datetime
 
 class MicrosoftExtractor:
-    def __init__(self, access_token):
-        self.access_token = access_token
+    def __init__(self, access_token=None):
+        # Allow passing token directly, or fetch from env var
+        self.access_token = access_token or os.environ.get("MS_GRAPH_TOKEN")
+        if not self.access_token:
+            # Optionally, auto-fetch a token using env credentials if not provided
+            tenant_id = os.environ.get("MS_TENANT_ID")
+            client_id = os.environ.get("MS_CLIENT_ID")
+            client_secret = os.environ.get("MS_CLIENT_SECRET")
+            if tenant_id and client_id and client_secret:
+                token_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
+                data = {
+                    "client_id": client_id,
+                    "scope": "https://graph.microsoft.com/.default",
+                    "client_secret": client_secret,
+                    "grant_type": "client_credentials"
+                }
+                resp = requests.post(token_url, data=data)
+                if resp.ok:
+                    self.access_token = resp.json().get("access_token")
+                else:
+                    raise Exception(f"Failed to obtain Microsoft Graph token: {resp.text}")
+            else:
+                raise Exception("No Microsoft Graph access token or credentials provided.")
         
         # Initialize data structure with lists
         self.contacts = {
