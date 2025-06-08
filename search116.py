@@ -1,6 +1,6 @@
 import argparse
 import logging
-from flask import Flask
+from flask import Flask, request, jsonify
 from requests_html import HTMLSession
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
@@ -73,6 +73,24 @@ def merge_profiles(web_json_path, email_csv_path, output_path):
     with open(output_path, 'w') as f:
         json.dump({'Donors': merged}, f, indent=2)
     print(f"Merged donor/contact profiles saved to: {output_path}")
+
+@app.route('/extract/microsoft', methods=['POST'])
+def extract_microsoft_contacts():
+    data = request.get_json()
+    access_token = data.get('access_token')
+    if not access_token:
+        return jsonify({'error': 'Missing access_token in request body'}), 400
+    contact_parser = ContactParser()
+    try:
+        ms_contacts = contact_parser.fetch_contacts(
+            system='microsoft',
+            access_token=access_token
+        )
+        # Optionally save to CSV
+        contact_parser.save_to_csv("microsoft_contacts.csv")
+        return jsonify({'contacts': ms_contacts}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     parser_arg = argparse.ArgumentParser(description='Run the Flask app, scan a website, or extract from email.')
