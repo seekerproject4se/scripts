@@ -141,13 +141,40 @@ if __name__ == '__main__':
         if not args.url:
             print("Please provide a --url to scan.")
             exit(1)
+            
+        # Handle authentication if credentials provided
+        if args.login_url and args.auth_username and args.auth_password:
+            print("🔐 Authenticating...")
+            authenticator = WebAuthenticator()
+            
+            if args.use_selenium_auth:
+                success = authenticator.authenticate_with_selenium(
+                    args.login_url, 
+                    args.auth_username, 
+                    args.auth_password
+                )
+            else:
+                success = authenticator.authenticate_with_requests(
+                    args.login_url, 
+                    args.auth_username, 
+                    args.auth_password
+                )
+            
+            if success:
+                # Load cookies into the existing session
+                authenticator.load_cookies_to_session(session)
+            
+            # Cleanup
+            authenticator.cleanup()
+        
         parser = Parser()
         parser.crawl_site(
             start_url=args.url,
             max_depth=args.max_depth,
             keywords=args.keywords
-        )
+        )        
         print("Scan complete. Data saved.")
+ 
         # --- Automatic aggregation ---
         web_json = find_latest_json()
         email_csv = find_latest_email_csv()
