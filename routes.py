@@ -88,6 +88,15 @@ def setup_routes(app):
             url = data.get('url')
             max_depth = data.get('max_depth', 4)
             keywords = data.get('keywords', [])
-            
             if not url:
                 return jsonify({'error': 'Missing required fields: url'}), 400
+            parser = Parser()
+            parser.crawl_site(
+                start_url=url,
+                max_depth=max_depth,
+                keywords=keywords
+            )
+            return jsonify({'status': 'success', 'message': 'Crawling started'}), 200
+        except Exception as e:
+            logging.error(f"Error in crawl_site: {e}")
+            return jsonify({'error': str(e)}), 500
