@@ -98,7 +98,7 @@ if __name__ == '__main__':
     parser_arg.add_argument('--host', type=str, default='0.0.0.0', help='Host to run the app on.')
     parser_arg.add_argument('--port', type=int, default=5001, help='Port to run the app on.')
     parser_arg.add_argument('--url', type=str, help='Target URL for scanning')
-    parser_arg.add_argument('--max-depth', type=int, default=2, help='Max crawl depth')
+    parser_arg.add_argument('--max-depth', type=int, default=4, help='Max crawl depth')
     parser_arg.add_argument('--keywords', nargs='*', help='Optional keywords to filter URLs')
     parser_arg.add_argument('--email-host', type=str, help='IMAP host for email extraction')
     parser_arg.add_argument('--email-user', type=str, help='IMAP username for email extraction')
