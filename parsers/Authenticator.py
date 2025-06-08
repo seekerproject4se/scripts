@@ -118,14 +118,12 @@ class WebAuthenticator:
             if os.path.exists(self.cookies_file):
                 with open(self.cookies_file, 'r') as f:
                     cookies = json.load(f)
-                
                 # Handle both formats (requests dict and selenium list)
                 if isinstance(cookies, dict):
                     session.cookies.update(cookies)
                 elif isinstance(cookies, list):
                     for cookie in cookies:
                         session.cookies.set(cookie['name'], cookie['value'])
-                
                 print("✓ Cookies loaded into session")
                 return True
         except Exception as e:
