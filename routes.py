@@ -1,7 +1,6 @@
 from flask import request, jsonify
 from datetime import datetime
-from parsers import Parser
-from parsers.Authenticator import WebAuthenticator
+from parsers import Parser, WebAuthenticator
 import logging
 import traceback
 
