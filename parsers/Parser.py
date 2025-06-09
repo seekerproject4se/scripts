@@ -142,12 +142,13 @@ class Parser:
                 if next_url.lower().endswith('.pdf') and is_same_domain(next_url):
                     from parsers.PDFExtractor import PDFExtractor
                     from config import key_data_patterns
-                    # Only download if key data is found
-                    _, contact_data = PDFExtractor.identify_and_download_pdf(
+                    pdf_result = PDFExtractor.identify_and_download_pdf(
                         next_url, '/tmp', key_data_patterns
                     )
-                    for profile in contact_data.get('profiles', []):
-                        all_profiles.append(profile)
+                    if pdf_result is not None:
+                        _, contact_data = pdf_result
+                        for profile in contact_data.get('profiles', []):
+                            all_profiles.append(profile)
                 # Continue crawling HTML links
                 elif is_same_domain(next_url):
                     # Filter by keywords if provided

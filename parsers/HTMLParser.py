@@ -114,8 +114,15 @@ class HTMLParser:
             return True
         def is_plausible_name(name):
             # At least two words, not all upper/lower, no numbers/special chars (except hyphen, apostrophe)
-            if not name or len(name.split()) < 2:
+            if not name or len(name) < 2:
                 return False
+            # Allow single-word names if they are capitalized and not a common word
+            if len(name.split()) == 1:
+                if not name[0].isupper():
+                    return False
+                if name.lower() in ['contact', 'email', 'phone', 'info', 'support', 'home', 'about', 'learn', 'events', 'application', 'portal', 'president', 'vice', 'director', 'manager', 'grantmaking', 'carolina', 'theatre', 'community', 'grant', 'donor', 'profile', 'team', 'staff', 'fund', 'advisor', 'services', 'resources', 'grant', 'scholarships', 'mutual', 'fund', 'shares', 'investment', 'management', 'reporting', 'general', 'inquiries', 'media', 'requests', 'volunteer']:
+                    return False
+            # Not all upper/lower, no numbers/special chars (except hyphen, apostrophe)
             if name.isupper() or name.islower():
                 return False
             if re.search(r'[^a-zA-Z\s\-\']', name):
@@ -128,13 +135,33 @@ class HTMLParser:
                 continue
             email_match = re.search(email_pattern, block_text)
             phone_match = re.search(phone_pattern, block_text)
-            name_match = re.search(r'\b[A-Z][a-z]+ [A-Z][a-z]+\b', block_text)
+            # Improved name extraction: allow single word, all caps, and fallback to nearby text
+            name_match = re.search(r'([A-Z][a-z]+(?: [A-Z][a-z]+)*|[A-Z]{2,}(?: [A-Z]{2,})*)', block_text)
+            name = name_match.group().strip() if name_match else ''
+            # Fallback: if no name, try previous sibling or heading
+            if not name:
+                prev = block.find_previous(['h1', 'h2', 'h3', 'h4', 'b', 'strong'])
+                if prev:
+                    prev_text = prev.get_text(separator=' ', strip=True)
+                    prev_name_match = re.search(r'([A-Z][a-z]+(?: [A-Z][a-z]+)*|[A-Z]{2,}(?: [A-Z]{2,})*)', prev_text)
+                    name = prev_name_match.group().strip() if prev_name_match else ''
             email = email_match.group() if email_match else None
             phone = phone_match.group() if phone_match else None
-            name = name_match.group() if name_match else ''
-            if not is_plausible_name(name):
-                continue
             if not ((email and is_valid_email(email)) or (phone and is_valid_phone(phone))):
+                continue
+            if not is_plausible_name(name):
+                # Fallback: use first 2-3 words before email/phone as name if they look like a name
+                if email:
+                    before_email = block_text.split(email)[0].strip()
+                    possible_name = ' '.join(before_email.split()[-3:])
+                    if is_plausible_name(possible_name):
+                        name = possible_name
+                elif phone:
+                    before_phone = block_text.split(phone)[0].strip()
+                    possible_name = ' '.join(before_phone.split()[-3:])
+                    if is_plausible_name(possible_name):
+                        name = possible_name
+            if not is_plausible_name(name):
                 continue
             profile_key = (name.lower(), email or '', phone or '')
             if profile_key in seen_profiles:
