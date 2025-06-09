@@ -94,3 +94,38 @@ class Parser:
         Save extracted data to a CSV file.
         """
         CSVExporter.save_csv(self.data_manager.card_dict, url)
+
+    def crawl_site(self, start_url, max_depth=4, keywords=None):
+        """
+        Recursively crawl the site starting from start_url up to max_depth.
+        Optionally filter URLs by keywords.
+        """
+        if keywords is None:
+            keywords = []
+        visited = set()
+
+        def crawl(url, depth):
+            if depth > max_depth or url in visited:
+                return
+            visited.add(url)
+            self.parse_data(url)
+            try:
+                html = fetch_html(url)
+                if not html:
+                    return
+                soup = BeautifulSoup(html, 'html.parser')
+                for link in soup.find_all('a', href=True):
+                    next_url = link['href']
+                    # Normalize relative URLs
+                    if not next_url.startswith('http'):
+                        from urllib.parse import urljoin
+                        next_url = urljoin(url, next_url)
+                    # Filter by keywords if provided
+                    if keywords and not any(kw.lower() in next_url.lower() for kw in keywords):
+                        continue
+                    if next_url not in visited:
+                        crawl(next_url, depth + 1)
+            except Exception as e:
+                logging.error(f"Error crawling {url}: {e}")
+
+        crawl(start_url, 1)
